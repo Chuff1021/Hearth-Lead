@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FileText, Filter, RefreshCw, MapPin, User, Hammer, DollarSign, Calendar, Map as MapIcon, List } from 'lucide-react';
+import { FileText, Filter, RefreshCw, MapPin, User, Hammer, DollarSign, Calendar, Map as MapIcon, List, ChevronRight } from 'lucide-react';
 import prisma from '@/lib/db';
 import { formatCurrency, formatDate, formatRelative, permitStatusBadge, urgencyBadge, urgencyBorder, stageBadge } from '@/lib/utils';
 import PermitMapWrapper from './PermitMapWrapper';
@@ -97,8 +97,20 @@ export default async function PermitsPage({ searchParams }: { searchParams: Reco
       {/* List View */}
       <div className="space-y-2">
         {permits.map(p => (
-          <div key={p.id} className={`card p-4 ${urgencyBorder(p.urgency)}`}>
+          <Link key={p.id} href={`/permits/${p.id}`} className={`card p-4 block hover:shadow-md transition-shadow cursor-pointer ${urgencyBorder(p.urgency)}`}>
             <div className="flex items-start gap-4">
+              {/* Date column */}
+              <div className="w-16 flex-shrink-0 text-center">
+                {p.dateFiled ? (
+                  <>
+                    <p className="text-lg font-bold text-gray-900">{new Date(p.dateFiled).toLocaleDateString('en-US', { month: 'short' })}</p>
+                    <p className="text-2xl font-bold text-gray-700 leading-tight">{new Date(p.dateFiled).getDate()}</p>
+                    <p className="text-xs text-gray-400">{new Date(p.dateFiled).getFullYear()}</p>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-300 mt-2">No date</p>
+                )}
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <h3 className="text-sm font-semibold text-gray-900">{p.propertyAddress}</h3>
@@ -113,7 +125,6 @@ export default async function PermitsPage({ searchParams }: { searchParams: Reco
                   {p.ownerName && <span className="flex items-center gap-1"><User className="w-3 h-3" />{p.ownerName}</span>}
                   {p.estimatedValue && <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{formatCurrency(p.estimatedValue)}</span>}
                   {p.squareFootage && <span>{Math.round(p.squareFootage)} sqft</span>}
-                  {p.dateFiled && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{formatDate(p.dateFiled)}</span>}
                   {p.subdivision && <span className="text-orange-600">{p.subdivision}</span>}
                 </div>
                 {p.description && <p className="text-xs text-gray-400 mt-1 truncate">{p.description}</p>}
@@ -123,14 +134,10 @@ export default async function PermitsPage({ searchParams }: { searchParams: Reco
                   <p className="text-xl font-bold text-orange-600">{p.leadScore}</p>
                   <p className="text-[10px] text-gray-400">score</p>
                 </div>
-                {p.lead ? (
-                  <span className={`btn-xs ${stageBadge(p.lead.stage)}`}>{p.lead.stage}</span>
-                ) : (
-                  <Link href={`/api/leads?createFromPermit=${p.id}`} className="btn-primary btn-xs">Create Lead</Link>
-                )}
+                <ChevronRight className="w-4 h-4 text-gray-300" />
               </div>
             </div>
-          </div>
+          </Link>
         ))}
         {permits.length === 0 && (
           <div className="card p-12 text-center text-gray-400">
