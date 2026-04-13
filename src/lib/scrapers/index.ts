@@ -1,61 +1,58 @@
-import { scrapeSpringfieldPermits } from './springfield';
-import { scrapeOzarkPermits } from './ozark';
-import type { ScrapedPermit } from './springfield';
-
-export type { ScrapedPermit };
+export interface ScrapedPermit {
+  permitNumber: string;
+  type: string;
+  subType?: string;
+  status: string;
+  propertyAddress: string;
+  city: string;
+  county: string;
+  zip?: string;
+  parcelNumber?: string;
+  ownerName?: string;
+  contractorName?: string;
+  subdivision?: string;
+  estimatedValue?: number;
+  squareFootage?: number;
+  dateFiled?: string;
+  dateApproved?: string;
+  description?: string;
+  rawData?: string;
+}
 
 export interface ScrapeResult {
   source: string;
   permits: ScrapedPermit[];
   error?: string;
-  scrapedAt: string;
 }
 
 /**
- * Run all scrapers and return combined results.
- * Each scraper runs independently so one failure doesn't block others.
+ * Modular scraping architecture.
+ * Each source is its own adapter — add new counties by adding a new file.
+ * Currently: Springfield eCity, Ozark SmartGov.
+ * Greene County and Christian County unincorporated don't have online portals — manual entry only.
  */
-export async function scrapeAllPermits(
-  options: { daysBack?: number } = {}
-): Promise<ScrapeResult[]> {
-  const { daysBack = 30 } = options;
+export async function scrapeAllPermits(options: { daysBack?: number } = {}): Promise<ScrapeResult[]> {
   const results: ScrapeResult[] = [];
 
-  const scrapers = [
-    {
-      name: 'springfield',
-      fn: () => scrapeSpringfieldPermits({ daysBack }),
-    },
-    {
-      name: 'ozark',
-      fn: () => scrapeOzarkPermits({ daysBack }),
-    },
+  // Each scraper runs independently so one failure doesn't block others
+  const scraperModules = [
+    { name: 'springfield', fn: () => import('./springfield').then(m => m.scrapeSpringfieldPermits(options)) },
+    { name: 'ozark', fn: () => import('./ozark').then(m => m.scrapeOzarkPermits(options)) },
   ];
 
   const settled = await Promise.allSettled(
-    scrapers.map(async (scraper) => {
+    scraperModules.map(async s => {
       try {
-        const permits = await scraper.fn();
-        return {
-          source: scraper.name,
-          permits,
-          scrapedAt: new Date().toISOString(),
-        };
-      } catch (error) {
-        return {
-          source: scraper.name,
-          permits: [],
-          error: error instanceof Error ? error.message : 'Unknown error',
-          scrapedAt: new Date().toISOString(),
-        };
+        const permits = await s.fn();
+        return { source: s.name, permits } as ScrapeResult;
+      } catch (err) {
+        return { source: s.name, permits: [], error: err instanceof Error ? err.message : 'Unknown' } as ScrapeResult;
       }
     })
   );
 
-  for (const result of settled) {
-    if (result.status === 'fulfilled') {
-      results.push(result.value);
-    }
+  for (const r of settled) {
+    if (r.status === 'fulfilled') results.push(r.value);
   }
 
   return results;

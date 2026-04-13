@@ -6,66 +6,115 @@
   html {
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
   }
   body {
-    @apply text-gray-900 bg-white;
+    @apply text-gray-900 bg-gray-50;
   }
 }
 
 @layer components {
-  .container-marketing {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  /* ── Layout ─────────────────────────── */
+  .page-header {
+    @apply flex items-center justify-between mb-6;
+  }
+  .page-title {
+    @apply text-2xl font-bold text-gray-900;
+  }
+  .page-subtitle {
+    @apply text-sm text-gray-500 mt-0.5;
+  }
+
+  /* ── Cards & Panels ─────────────────── */
+  .card {
+    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+  }
+  .card-header {
+    @apply flex items-center justify-between px-5 py-4 border-b border-gray-100;
+  }
+  .card-title {
+    @apply text-sm font-semibold text-gray-900;
+  }
+  .card-body {
+    @apply p-5;
+  }
+
+  /* ── Buttons ────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-hearth-600 hover:bg-hearth-700 transition-colors duration-150 shadow-sm hover:shadow-md;
+    @apply btn bg-orange-600 text-white hover:bg-orange-700 shadow-sm;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center px-6 py-3 border-2 border-hearth-600 text-base font-medium rounded-lg text-hearth-700 bg-white hover:bg-hearth-50 transition-colors duration-150;
+    @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 shadow-sm;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-600 hover:text-hearth-600 hover:bg-gray-50 rounded-lg transition-colors duration-150;
+    @apply btn text-gray-600 hover:text-gray-900 hover:bg-gray-100;
   }
-  .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200;
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700;
   }
-  .input-field {
-    @apply block w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-hearth-500 focus:ring-2 focus:ring-hearth-500/20 focus:outline-none transition-colors;
+  .btn-success {
+    @apply btn bg-green-600 text-white hover:bg-green-700;
   }
+  .btn-xs {
+    @apply text-xs px-2.5 py-1.5 rounded-md;
+  }
+  .btn-sm {
+    @apply text-xs px-3 py-1.5;
+  }
+
+  /* ── Inputs ─────────────────────────── */
+  .input {
+    @apply block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none transition-colors bg-white;
+  }
+  .select {
+    @apply input appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%236b7280%22%20d%3D%22M6%208L1%203h10z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[center_right_0.75rem] pr-8;
+  }
+  .textarea {
+    @apply input resize-none;
+  }
+  .label {
+    @apply block text-xs font-medium text-gray-600 mb-1;
+  }
+
+  /* ── Badges ─────────────────────────── */
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold leading-tight;
   }
-  .badge-green {
-    @apply badge bg-green-100 text-green-800;
+  .badge-green  { @apply badge bg-green-100 text-green-800; }
+  .badge-yellow { @apply badge bg-yellow-100 text-yellow-800; }
+  .badge-blue   { @apply badge bg-blue-100 text-blue-800; }
+  .badge-red    { @apply badge bg-red-100 text-red-800; }
+  .badge-orange { @apply badge bg-orange-100 text-orange-800; }
+  .badge-gray   { @apply badge bg-gray-100 text-gray-700; }
+  .badge-purple { @apply badge bg-purple-100 text-purple-800; }
+
+  /* ── Urgency indicators ─────────────── */
+  .urgency-hot  { @apply border-l-4 border-l-red-500; }
+  .urgency-warm { @apply border-l-4 border-l-orange-400; }
+  .urgency-normal { @apply border-l-4 border-l-blue-300; }
+  .urgency-cold { @apply border-l-4 border-l-gray-200; }
+
+  /* ── Table ──────────────────────────── */
+  .table-row {
+    @apply hover:bg-gray-50 transition-colors cursor-default;
   }
-  .badge-yellow {
-    @apply badge bg-yellow-100 text-yellow-800;
+  .table-th {
+    @apply px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider;
   }
-  .badge-blue {
-    @apply badge bg-blue-100 text-blue-800;
+  .table-td {
+    @apply px-4 py-3 text-sm;
   }
-  .badge-red {
-    @apply badge bg-red-100 text-red-800;
+
+  /* ── Kanban ─────────────────────────── */
+  .kanban-column {
+    @apply flex-1 min-w-[280px] max-w-[340px] flex flex-col;
   }
-  .badge-gray {
-    @apply badge bg-gray-100 text-gray-800;
+  .kanban-header {
+    @apply flex items-center justify-between mb-3 px-1;
   }
-  .prose-hearth h2 {
-    @apply text-2xl font-bold text-gray-900 mt-10 mb-4;
-  }
-  .prose-hearth h3 {
-    @apply text-xl font-semibold text-gray-900 mt-8 mb-3;
-  }
-  .prose-hearth p {
-    @apply text-gray-600 leading-relaxed mb-4;
-  }
-  .prose-hearth ul {
-    @apply list-disc pl-6 mb-4 space-y-2 text-gray-600;
-  }
-  .prose-hearth ol {
-    @apply list-decimal pl-6 mb-4 space-y-2 text-gray-600;
-  }
-  .prose-hearth a {
-    @apply text-hearth-600 hover:text-hearth-700 underline;
+  .kanban-card {
+    @apply card p-4 mb-3 cursor-default;
   }
 }

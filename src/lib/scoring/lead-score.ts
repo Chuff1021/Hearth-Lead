@@ -1,203 +1,147 @@
 /**
- * Lead scoring engine for building permit leads.
- *
- * Scores range from 0-100 based on multiple factors that indicate
- * likelihood of fireplace purchase.
+ * Lead scoring engine. Scores 0-100 and assigns urgency (hot/warm/normal/cold).
+ * Higher score = more likely to buy a fireplace from Aaron's.
  */
 
-interface LeadScoreInput {
-  type: string;           // permit type
-  estimatedValue?: number;
-  squareFootage?: number;
-  status?: string;        // permit status
-  subdivision?: string;
-  contractorName?: string;
-  city?: string;
-  county?: string;
-  dateFiled?: Date;
-  description?: string;
+interface ScoreInput {
+  type: string;
+  estimatedValue?: number | null;
+  squareFootage?: number | null;
+  status?: string | null;
+  subdivision?: string | null;
+  contractorName?: string | null;
+  city?: string | null;
+  dateFiled?: Date | null;
+  isPartnerBuilder?: boolean;
 }
 
-interface ScoreBreakdown {
+interface ScoreResult {
   total: number;
+  urgency: 'hot' | 'warm' | 'normal' | 'cold';
   factors: { name: string; points: number; reason: string }[];
+  idealContactWindow: string;
 }
 
-// Known builders who frequently include fireplaces
-const HIGH_FIREPLACE_BUILDERS = [
-  'john marion',
-  'alair homes',
-  'wisebuilt',
-  'wise-built',
-  'built by brett',
-  'trendsetter',
-];
+const PARTNER_BUILDERS: string[] = []; // filled from DB at runtime
+const PREMIUM_SUBS = ['lakes at wild horse', 'lakepointe reserve', 'fremont hills', 'the bridges', 'elfindale', 'southern hills', 'rivercut'];
 
-// Known builders with fireplace as optional upgrade (good prospects)
-const OPTIONAL_FIREPLACE_BUILDERS = [
-  'schuber mitchell',
-  'cronkhite',
-];
+export function scorePermitLead(input: ScoreInput): ScoreResult {
+  const factors: ScoreResult['factors'] = [];
 
-// Premium subdivisions where fireplaces are common
-const PREMIUM_SUBDIVISIONS = [
-  'lakes at wild horse',
-  'lakepointe reserve',
-  'woodvale',
-  'elfindale',
-  'rivercut',
-  'greenbridge estates',
-];
-
-export function scorePermitLead(input: LeadScoreInput): ScoreBreakdown {
-  const factors: ScoreBreakdown['factors'] = [];
-
-  // Factor 1: Permit type (0-20 points)
+  // 1. Permit type (0-20)
   if (input.type === 'new_residential') {
-    factors.push({ name: 'permit_type', points: 20, reason: 'New residential construction' });
+    factors.push({ name: 'type', points: 20, reason: 'New residential construction' });
   } else if (input.type === 'addition') {
-    factors.push({ name: 'permit_type', points: 8, reason: 'Home addition (possible fireplace add)' });
+    factors.push({ name: 'type', points: 8, reason: 'Home addition' });
   } else if (input.type === 'remodel') {
-    factors.push({ name: 'permit_type', points: 5, reason: 'Remodel (possible fireplace retrofit)' });
+    factors.push({ name: 'type', points: 4, reason: 'Remodel' });
   }
 
-  // Factor 2: Construction value (0-20 points)
+  // 2. Construction value (0-20)
   if (input.estimatedValue) {
-    if (input.estimatedValue >= 500000) {
-      factors.push({ name: 'value', points: 20, reason: `High value home ($${(input.estimatedValue/1000).toFixed(0)}K)` });
-    } else if (input.estimatedValue >= 350000) {
-      factors.push({ name: 'value', points: 16, reason: `Above-average value ($${(input.estimatedValue/1000).toFixed(0)}K)` });
-    } else if (input.estimatedValue >= 250000) {
-      factors.push({ name: 'value', points: 12, reason: `Mid-range value ($${(input.estimatedValue/1000).toFixed(0)}K)` });
-    } else if (input.estimatedValue >= 150000) {
-      factors.push({ name: 'value', points: 6, reason: `Moderate value ($${(input.estimatedValue/1000).toFixed(0)}K)` });
-    }
+    if (input.estimatedValue >= 500000) factors.push({ name: 'value', points: 20, reason: 'Luxury home ($500K+)' });
+    else if (input.estimatedValue >= 350000) factors.push({ name: 'value', points: 16, reason: 'Upper-mid home ($350K+)' });
+    else if (input.estimatedValue >= 250000) factors.push({ name: 'value', points: 12, reason: 'Mid-range home ($250K+)' });
+    else if (input.estimatedValue >= 180000) factors.push({ name: 'value', points: 6, reason: 'Starter home ($180K+)' });
   }
 
-  // Factor 3: Square footage (0-15 points)
+  // 3. Square footage (0-15)
   if (input.squareFootage) {
-    if (input.squareFootage >= 3000) {
-      factors.push({ name: 'size', points: 15, reason: `Large home (${input.squareFootage} sq ft)` });
-    } else if (input.squareFootage >= 2200) {
-      factors.push({ name: 'size', points: 12, reason: `Above-average size (${input.squareFootage} sq ft)` });
-    } else if (input.squareFootage >= 1600) {
-      factors.push({ name: 'size', points: 8, reason: `Average size (${input.squareFootage} sq ft)` });
-    } else {
-      factors.push({ name: 'size', points: 3, reason: `Smaller home (${input.squareFootage} sq ft)` });
-    }
+    if (input.squareFootage >= 3000) factors.push({ name: 'sqft', points: 15, reason: 'Large home (3000+ sqft)' });
+    else if (input.squareFootage >= 2200) factors.push({ name: 'sqft', points: 11, reason: 'Above average (2200+ sqft)' });
+    else if (input.squareFootage >= 1600) factors.push({ name: 'sqft', points: 7, reason: 'Average size (1600+ sqft)' });
+    else factors.push({ name: 'sqft', points: 3, reason: 'Smaller home' });
   }
 
-  // Factor 4: Permit timing / status (0-15 points)
-  // Earlier stages = hotter leads (they haven't committed to a fireplace yet)
+  // 4. Permit timing (0-15) — earlier = hotter
   if (input.status) {
     switch (input.status) {
-      case 'applied':
-        factors.push({ name: 'timing', points: 15, reason: 'Just applied — earliest possible contact' });
-        break;
-      case 'approved':
-      case 'in_review':
-        factors.push({ name: 'timing', points: 12, reason: 'Approved/in review — ideal timing for fireplace discussion' });
-        break;
-      case 'under_inspection':
-        factors.push({ name: 'timing', points: 6, reason: 'Under inspection — may still be able to add fireplace' });
-        break;
-      case 'final':
-      case 'co_issued':
-        factors.push({ name: 'timing', points: 2, reason: 'Construction complete — retrofit only' });
-        break;
+      case 'applied': factors.push({ name: 'timing', points: 15, reason: 'Just applied — reach out NOW' }); break;
+      case 'in_review': factors.push({ name: 'timing', points: 13, reason: 'In review — perfect timing' }); break;
+      case 'approved': factors.push({ name: 'timing', points: 10, reason: 'Approved — contact before framing starts' }); break;
+      case 'under_inspection': factors.push({ name: 'timing', points: 5, reason: 'Under inspection — may be too late for rough-in' }); break;
+      case 'final': case 'co_issued': factors.push({ name: 'timing', points: 2, reason: 'Construction done — retrofit only' }); break;
     }
   }
 
-  // Factor 5: Builder/contractor (0-15 points)
-  if (input.contractorName) {
-    const contractor = input.contractorName.toLowerCase();
-
-    if (HIGH_FIREPLACE_BUILDERS.some(b => contractor.includes(b))) {
-      factors.push({ name: 'builder', points: 15, reason: `Premium builder: ${input.contractorName}` });
-    } else if (OPTIONAL_FIREPLACE_BUILDERS.some(b => contractor.includes(b))) {
-      factors.push({ name: 'builder', points: 12, reason: `Builder offers fireplace upgrades: ${input.contractorName}` });
-    } else {
-      factors.push({ name: 'builder', points: 5, reason: `Known builder: ${input.contractorName}` });
-    }
+  // 5. Builder relationship (0-15)
+  if (input.isPartnerBuilder) {
+    factors.push({ name: 'builder', points: 15, reason: 'Partner builder — warm lead!' });
+  } else if (input.contractorName) {
+    factors.push({ name: 'builder', points: 5, reason: `Known builder: ${input.contractorName}` });
   }
 
-  // Factor 6: Subdivision (0-10 points)
+  // 6. Subdivision (0-10)
   if (input.subdivision) {
     const sub = input.subdivision.toLowerCase();
-    if (PREMIUM_SUBDIVISIONS.some(s => sub.includes(s))) {
-      factors.push({ name: 'subdivision', points: 10, reason: `Premium subdivision: ${input.subdivision}` });
+    if (PREMIUM_SUBS.some(s => sub.includes(s))) {
+      factors.push({ name: 'subdivision', points: 10, reason: `Premium area: ${input.subdivision}` });
     } else {
-      factors.push({ name: 'subdivision', points: 4, reason: `Known subdivision: ${input.subdivision}` });
+      factors.push({ name: 'subdivision', points: 4, reason: input.subdivision });
     }
   }
 
-  // Factor 7: Recency bonus (0-5 points)
+  // 7. Recency (0-5)
   if (input.dateFiled) {
-    const daysAgo = Math.floor((Date.now() - input.dateFiled.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysAgo <= 7) {
-      factors.push({ name: 'recency', points: 5, reason: 'Filed within last week' });
-    } else if (daysAgo <= 14) {
-      factors.push({ name: 'recency', points: 3, reason: 'Filed within last 2 weeks' });
-    } else if (daysAgo <= 30) {
-      factors.push({ name: 'recency', points: 1, reason: 'Filed within last month' });
-    }
+    const daysOld = Math.floor((Date.now() - input.dateFiled.getTime()) / 86400000);
+    if (daysOld <= 3) factors.push({ name: 'recency', points: 5, reason: 'Filed in last 3 days' });
+    else if (daysOld <= 7) factors.push({ name: 'recency', points: 4, reason: 'Filed this week' });
+    else if (daysOld <= 14) factors.push({ name: 'recency', points: 2, reason: 'Filed in last 2 weeks' });
+    else if (daysOld <= 30) factors.push({ name: 'recency', points: 1, reason: 'Filed this month' });
   }
 
-  const total = Math.min(100, factors.reduce((sum, f) => sum + f.points, 0));
+  const total = Math.min(100, factors.reduce((s, f) => s + f.points, 0));
 
-  return { total, factors };
-}
+  let urgency: ScoreResult['urgency'] = 'cold';
+  if (total >= 70 || input.isPartnerBuilder) urgency = 'hot';
+  else if (total >= 50) urgency = 'warm';
+  else if (total >= 30) urgency = 'normal';
 
-export function getLeadPriority(score: number): 'hot' | 'warm' | 'cool' | 'cold' {
-  if (score >= 75) return 'hot';
-  if (score >= 50) return 'warm';
-  if (score >= 30) return 'cool';
-  return 'cold';
-}
-
-export function generateOutreachMessage(
-  type: 'homeowner' | 'builder',
-  data: {
-    name?: string;
-    address?: string;
-    builderName?: string;
-    subdivision?: string;
+  // Override urgency for time-sensitive permits
+  if (input.status === 'applied' || input.status === 'in_review') {
+    if (urgency === 'normal') urgency = 'warm';
   }
-): string {
+
+  let idealContactWindow = 'No rush';
+  if (input.status === 'applied' || input.status === 'in_review') idealContactWindow = 'Contact within 48 hours';
+  else if (input.status === 'approved') idealContactWindow = 'Contact within 1 week';
+  else if (input.status === 'under_inspection') idealContactWindow = 'Window closing — contact ASAP';
+  else if (input.status === 'final' || input.status === 'co_issued') idealContactWindow = 'Retrofit opportunity only';
+
+  return { total, urgency, factors, idealContactWindow };
+}
+
+export function generateOutreachMessage(type: 'homeowner' | 'builder', data: { name?: string; address?: string; builderName?: string; subdivision?: string }): string {
   if (type === 'homeowner') {
-    const name = data.name || 'Homeowner';
-    const address = data.address ? ` at ${data.address}` : '';
-    return `Dear ${name},
+    return `Hi ${data.name || 'there'},
 
-Congratulations on your new home${address}! Building a new home is one of life's most exciting experiences, and we'd love to help you make it even more special.
+Congratulations on your new home${data.address ? ` at ${data.address}` : ''}! I'm Aaron from Aaron's Fireplace here in Springfield.
 
-Before your builder frames the fireplace chase, let's discuss your options. Installing a fireplace during construction saves $3,000–$5,000 compared to adding one after the home is complete.
+I wanted to reach out because there's a short window during construction where adding a fireplace is easy and affordable — once the framing goes up, it gets a lot more expensive. If your builder hasn't already planned for one, I'd love to show you some options.
 
-We offer free in-home consultations where we'll review your floor plan and recommend the perfect fireplace for your space, style, and budget. We work with all major builders in the Springfield area and can coordinate directly with your construction team.
+We offer free on-site consultations and work directly with your builder's crew. Most of our new construction installs run $2,500-$6,000 depending on what you're looking for.
 
-Would you like to schedule a free consultation? Call us at ${process.env.NEXT_PUBLIC_PHONE || '(417) 555-0199'} or reply to this message.
+Would you be open to a quick chat? You can reach me at (417) 823-3411 or just reply to this message.
 
-Warm regards,
-${process.env.NEXT_PUBLIC_BUSINESS_NAME || 'Hearth & Home Fireplace Co.'}`;
+Thanks,
+Aaron
+Aaron's Fireplace
+Springfield, MO`;
   }
 
-  const builderName = data.builderName || 'your team';
-  const subdivision = data.subdivision ? ` in ${data.subdivision}` : '';
-  return `Hello,
+  return `Hi,
 
-We noticed ${builderName} is starting new construction${subdivision}. We'd love to be your preferred fireplace supplier for these homes.
+I noticed ${data.builderName || 'your company'} has some new permits filed${data.subdivision ? ` in ${data.subdivision}` : ''}. I'm Aaron from Aaron's Fireplace — we're a local hearth dealer here in Springfield.
 
-As a local fireplace dealer, we can offer:
-- Competitive wholesale pricing on gas, wood, and electric fireplaces
-- Direct coordination with your framing crew on rough-in specs
-- Quick turnaround on product selection and installation
-- Warranty support and service for your homebuyers
+I work with several builders in the area as their go-to fireplace supplier. What that looks like:
+- Wholesale pricing on gas, wood, and electric fireplaces
+- We handle all rough-in coordination with your framing crew
+- Quick turnaround — we don't hold up your schedule
+- Full warranty support for your buyers
 
-Many of our builder partners find that offering a fireplace upgrade increases their average sale price by $4,000–$8,000 while only adding $2,500–$5,000 in cost.
+Would you be open to a quick meeting? Happy to bring some product info and pricing.
 
-Could we schedule a quick meeting to discuss a partnership? I'd be happy to bring product samples and pricing.
-
-Best regards,
-${process.env.NEXT_PUBLIC_BUSINESS_NAME || 'Hearth & Home Fireplace Co.'}
-${process.env.NEXT_PUBLIC_PHONE || '(417) 555-0199'}`;
+Aaron
+Aaron's Fireplace
+(417) 823-3411`;
 }

@@ -7,41 +7,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── PERMIT DATA ────────────────────────────────────────────
+// ─── PERMITS ────────────────────────────────────────────────
 
 model Permit {
-  id               String   @id @default(cuid())
-  permitNumber     String   @unique
-  source           String   // springfield, ozark, nixa, greene_county, christian_county
-  type             String   // new_residential, commercial, remodel, addition, other
-  subType          String?  // single_family, multi_family, townhome
-  status           String   // applied, approved, in_review, under_inspection, final, co_issued
-  propertyAddress  String
-  city             String
-  county           String   // Greene, Christian
-  zip              String?
-  parcelNumber     String?
-  ownerName        String?
-  ownerAddress     String?
-  ownerPhone       String?
-  ownerEmail       String?
-  contractorName   String?
-  contractorId     String?
-  subdivision      String?
-  estimatedValue   Float?
-  squareFootage    Float?
-  stories          Int?
-  dateFiled        DateTime?
-  dateApproved     DateTime?
-  dateIssued       DateTime?
-  dateFinal        DateTime?
-  description      String?
-  rawData          String?  // JSON blob of original scraped data
-  leadScore        Int      @default(0) // 0-100
-  leadId           String?
-  lead             Lead?    @relation(fields: [leadId], references: [id])
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(cuid())
+  permitNumber    String   @unique
+  source          String   // springfield, ozark, nixa, greene_county, christian_county
+  type            String   // new_residential, commercial, remodel, addition, other
+  subType         String?  // single_family, multi_family, townhome
+  status          String   // applied, approved, in_review, under_inspection, final, co_issued
+  propertyAddress String
+  city            String
+  county          String   // Greene, Christian
+  zip             String?
+  parcelNumber    String?
+  ownerName       String?
+  ownerMailingAddr String?
+  ownerPhone      String?
+  ownerEmail      String?
+  contractorName  String?
+  contractorLicense String?
+  builderId       String?
+  builder         Builder? @relation(fields: [builderId], references: [id])
+  subdivision     String?
+  estimatedValue  Float?
+  squareFootage   Float?
+  stories         Int?
+  bedrooms        Int?
+  bathrooms       Float?
+  dateFiled       DateTime?
+  dateApproved    DateTime?
+  dateIssued      DateTime?
+  dateFinal       DateTime?
+  description     String?
+  rawData         String?
+  leadScore       Int      @default(0)
+  urgency         String   @default("normal") // hot, warm, normal, cold
+  leadId          String?
+  lead            Lead?    @relation(fields: [leadId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([city])
   @@index([county])
@@ -51,46 +56,51 @@ model Permit {
   @@index([contractorName])
   @@index([subdivision])
   @@index([leadScore])
+  @@index([urgency])
+  @@index([builderId])
 }
 
 // ─── LEADS ──────────────────────────────────────────────────
 
 model Lead {
-  id              String   @id @default(cuid())
-  type            String   // permit_lead, website_lead, builder_lead
-  status          String   @default("new") // new, contacted, quoted, won, lost
-  score           Int      @default(0) // 0-100
-  firstName       String?
-  lastName        String?
-  email           String?
-  phone           String?
-  address         String?
-  city            String?
-  county          String?
-  builderName     String?
-  builderId       String?
-  builder         Builder? @relation(fields: [builderId], references: [id])
-  subdivision     String?
-  homeSize        String?  // sq ft range
-  budget          String?  // budget range
-  fuelPreference  String?  // gas, wood, electric
-  style           String?  // modern, traditional, rustic
-  timeline        String?  // planning, building, framing, finishing
-  source          String?  // organic, direct, referral, permit_data
-  sourcePage      String?  // which page they came from
-  sourceCta       String?  // which CTA they clicked
-  notes           String?
-  permits         Permit[]
-  outreachLogs    OutreachLog[]
-  captures        LeadCapture[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  source         String   // permit, organic, google_business, referral, walk_in, phone, other
+  stage          String   @default("new") // new, contacted, quoted, sold, lost
+  score          Int      @default(0)
+  urgency        String   @default("normal") // hot, warm, normal, cold
+  firstName      String?
+  lastName       String?
+  email          String?
+  phone          String?
+  address        String?
+  city           String?
+  county         String?
+  subdivision    String?
+  builderId      String?
+  builder        Builder? @relation(fields: [builderId], references: [id])
+  homeSize       String?
+  homeValue      Float?
+  fuelPreference String?  // gas, wood, electric, pellet
+  productInterest String? // fireplace, insert, stove, outdoor, accessories
+  budget         String?
+  timeline       String?  // planning, foundation, framing, finishing, complete, unknown
+  notes          String?
+  lostReason     String?
+  soldAmount     Float?
+  soldDate       DateTime?
+  nextFollowUp   DateTime?
+  firstContactAt DateTime?
+  permits        Permit[]
+  outreach       OutreachLog[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  @@index([status])
+  @@index([stage])
   @@index([score])
-  @@index([type])
-  @@index([city])
+  @@index([source])
+  @@index([urgency])
   @@index([builderId])
+  @@index([nextFollowUp])
 }
 
 // ─── BUILDERS ───────────────────────────────────────────────
@@ -99,23 +109,26 @@ model Builder {
   id              String   @id @default(cuid())
   slug            String   @unique
   name            String
-  company         String?
+  contactName     String?
   phone           String?
   email           String?
   website         String?
   licenseNumber   String?
   address         String?
   city            String?
-  specialties     String?  // JSON array: custom, production, spec, remodel
-  avgHomePrice    String?  // price range
-  fireplaceRate   Float?   // 0-1, what % of their homes have fireplaces
+  specialties     String?  // JSON array
+  avgHomePrice    String?
+  fireplaceRate   Float?   // 0-1
   relationship    String   @default("unknown") // unknown, contacted, pitched, partner, declined
+  partnerSince    DateTime?
   notes           String?
   totalPermits    Int      @default(0)
   activePermits   Int      @default(0)
+  totalSales      Int      @default(0)
+  totalRevenue    Float    @default(0)
+  permits         Permit[]
   leads           Lead[]
-  outreachLogs    OutreachLog[]
-  subdivisions    Subdivision[]
+  outreach        OutreachLog[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -123,110 +136,179 @@ model Builder {
   @@index([totalPermits])
 }
 
-// ─── SUBDIVISIONS ───────────────────────────────────────────
-
-model Subdivision {
-  id              String   @id @default(cuid())
-  slug            String   @unique
-  name            String
-  city            String
-  county          String
-  zip             String?
-  builderId       String?
-  builder         Builder? @relation(fields: [builderId], references: [id])
-  priceRange      String?
-  homeSizeRange   String?
-  totalLots       Int?
-  activeLots      Int?
-  description     String?
-  fireplaceNotes  String?  // what fireplace options are popular here
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([city])
-  @@index([builderId])
-}
-
 // ─── OUTREACH ───────────────────────────────────────────────
 
 model OutreachLog {
-  id          String   @id @default(cuid())
-  leadId      String?
-  lead        Lead?    @relation(fields: [leadId], references: [id])
-  builderId   String?
-  builder     Builder? @relation(fields: [builderId], references: [id])
-  type        String   // email, phone, mail, in_person
-  direction   String   // outbound, inbound
-  subject     String?
-  body        String?
-  outcome     String?  // no_answer, left_message, spoke, meeting_set, quote_sent
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  leadId     String?
+  lead       Lead?    @relation(fields: [leadId], references: [id])
+  builderId  String?
+  builder    Builder? @relation(fields: [builderId], references: [id])
+  type       String   // email, phone, mail, text, in_person, site_visit
+  direction  String   // outbound, inbound
+  templateId String?
+  subject    String?
+  body       String?
+  outcome    String?  // no_answer, left_message, spoke, meeting_set, quote_sent, declined, sold
+  notes      String?
+  followUpAt DateTime?
+  createdAt  DateTime @default(now())
 
   @@index([leadId])
   @@index([builderId])
+  @@index([createdAt])
 }
 
-// ─── LEAD CAPTURES (website form submissions) ───────────────
+// ─── OUTREACH TEMPLATES ─────────────────────────────────────
 
-model LeadCapture {
-  id            String   @id @default(cuid())
-  leadId        String?
-  lead          Lead?    @relation(fields: [leadId], references: [id])
-  firstName     String
-  lastName      String?
-  email         String
-  phone         String?
-  message       String?
-  page          String   // which page the form was on
-  cta           String?  // which CTA triggered it
-  formType      String   // contact, quiz, checklist, consultation
-  answers       String?  // JSON blob of quiz answers
-  ipAddress     String?
-  userAgent     String?
-  referrer      String?
-  utmSource     String?
-  utmMedium     String?
-  utmCampaign   String?
-  createdAt     DateTime @default(now())
-
-  @@index([email])
-  @@index([page])
-  @@index([formType])
+model OutreachTemplate {
+  id       String @id @default(cuid())
+  name     String
+  type     String // homeowner_intro, builder_pitch, follow_up, quote_follow_up, thank_you
+  channel  String // email, mail, text
+  subject  String?
+  body     String
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-// ─── BLOG/SEO CONTENT ───────────────────────────────────────
+// ─── SEO KEYWORDS ───────────────────────────────────────────
 
-model BlogPost {
+model SeoKeyword {
   id            String   @id @default(cuid())
-  slug          String   @unique
-  title         String
-  metaTitle     String?
-  metaDescription String?
-  excerpt       String?
-  content       String   // HTML content
-  category      String?  // guide, comparison, local, checklist
-  tags          String?  // JSON array
-  published     Boolean  @default(false)
-  publishedAt   DateTime?
+  keyword       String   @unique
+  category      String?  // primary, secondary, local, long_tail
+  targetPage    String?
+  currentRank   Int?
+  previousRank  Int?
+  monthlyVolume Int?
+  difficulty    Int?     // 0-100
+  clickRate     Float?
+  impressions   Int?
+  clicks        Int?
+  notes         String?
+  isTracking    Boolean  @default(true)
+  lastChecked   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@index([slug])
-  @@index([published])
-  @@index([category])
+  @@index([isTracking])
+  @@index([currentRank])
 }
 
-// ─── ANALYTICS EVENTS ───────────────────────────────────────
+// ─── SEO TASKS ──────────────────────────────────────────────
 
-model AnalyticsEvent {
-  id        String   @id @default(cuid())
-  event     String   // page_view, cta_click, form_submit, phone_click
-  page      String?
-  data      String?  // JSON blob
-  sessionId String?
-  createdAt DateTime @default(now())
+model SeoTask {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  priority    String   @default("medium") // critical, high, medium, low
+  status      String   @default("todo") // todo, in_progress, done, dismissed
+  category    String   // technical, content, local, backlinks, speed
+  page        String?  // which page this applies to
+  impact      String?  // plain language impact description
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@index([event])
-  @@index([page])
-  @@index([createdAt])
+  @@index([status])
+  @@index([priority])
+}
+
+// ─── SEO PAGE HEALTH ────────────────────────────────────────
+
+model SeoPage {
+  id              String   @id @default(cuid())
+  url             String   @unique
+  title           String?
+  metaDescription String?
+  h1              String?
+  wordCount       Int?
+  hasAltTags      Boolean?
+  loadTimeMs      Int?
+  internalLinks   Int?
+  externalLinks   Int?
+  healthScore     Int?     // 0-100
+  issues          String?  // JSON array of issues
+  lastAudited     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── GOOGLE BUSINESS PROFILE ────────────────────────────────
+
+model GbpReview {
+  id           String   @id @default(cuid())
+  reviewerName String
+  rating       Int      // 1-5
+  text         String?
+  reviewDate   DateTime
+  responseText String?
+  responseDate DateTime?
+  status       String   @default("needs_response") // needs_response, responded, flagged, no_response_needed
+  platform     String   @default("google") // google, yelp, facebook
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status])
+  @@index([rating])
+  @@index([reviewDate])
+}
+
+model GbpPost {
+  id          String    @id @default(cuid())
+  title       String
+  body        String
+  type        String    // update, offer, event, product
+  status      String    @default("draft") // draft, scheduled, published
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  imageUrl    String?
+  ctaType     String?   // learn_more, call, book, order, shop
+  ctaUrl      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+}
+
+// ─── CONTENT CALENDAR ───────────────────────────────────────
+
+model ContentItem {
+  id            String    @id @default(cuid())
+  title         String
+  type          String    // blog_post, social_post, email_campaign, video, landing_page
+  status        String    @default("idea") // idea, planned, drafting, review, published
+  targetKeyword String?
+  searchVolume  Int?
+  dueDate       DateTime?
+  publishDate   DateTime?
+  assignedTo    String?
+  outline       String?
+  notes         String?
+  url           String?   // published URL
+  pageViews     Int?
+  leadsGenerated Int?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([dueDate])
+  @@index([type])
+}
+
+// ─── COMPETITORS ────────────────────────────────────────────
+
+model Competitor {
+  id           String   @id @default(cuid())
+  name         String
+  website      String?
+  googleRating Float?
+  reviewCount  Int?
+  gbpPostFreq  String?  // weekly, monthly, rarely, never
+  topKeywords  String?  // JSON array
+  notes        String?
+  lastChecked  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

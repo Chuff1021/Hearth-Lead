@@ -1,41 +1,43 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { scrapeAllPermits } from '@/lib/scrapers';
 import { scorePermitLead } from '@/lib/scoring/lead-score';
 
+/**
+ * Trigger permit scraping from all sources.
+ * GET /api/scrape — runs all scrapers and returns results.
+ *
+ * In production this would be triggered by a cron job (Vercel cron or external).
+ * The actual scraping logic is in src/lib/scrapers/ — each source is modular.
+ */
 export async function GET() {
-  const results = {
-    scraped: 0,
-    new: 0,
-    updated: 0,
-    errors: [] as string[],
-    sources: [] as { source: string; found: number; error?: string }[],
-  };
+  const results = { checked: 0, newPermits: 0, updated: 0, newLeads: 0, errors: [] as string[] };
 
   try {
+    // Dynamic import to keep bundle small
+    const { scrapeAllPermits } = await import('@/lib/scrapers');
     const scrapeResults = await scrapeAllPermits({ daysBack: 30 });
 
     for (const result of scrapeResults) {
-      results.sources.push({
-        source: result.source,
-        found: result.permits.length,
-        error: result.error,
-      });
-
       if (result.error) {
         results.errors.push(`${result.source}: ${result.error}`);
       }
 
       for (const permit of result.permits) {
-        results.scraped++;
-
+        results.checked++;
         try {
-          // Check if permit already exists
-          const existing = await prisma.permit.findUnique({
-            where: { permitNumber: permit.permitNumber },
-          });
+          const existing = await prisma.permit.findUnique({ where: { permitNumber: permit.permitNumber } });
 
-          // Score the lead
+          // Check if builder is a partner
+          let isPartner = false;
+          let builderId: string | undefined;
+          if (permit.contractorName) {
+            const builder = await prisma.builder.findFirst({ where: { name: { contains: permit.contractorName } } });
+            if (builder) {
+              builderId = builder.id;
+              isPartner = builder.relationship === 'partner';
+            }
+          }
+
           const score = scorePermitLead({
             type: permit.type,
             estimatedValue: permit.estimatedValue,
@@ -44,17 +46,14 @@ export async function GET() {
             subdivision: permit.subdivision,
             contractorName: permit.contractorName,
             city: permit.city,
-            dateFiled: permit.dateFiled ? new Date(permit.dateFiled) : undefined,
+            dateFiled: permit.dateFiled ? new Date(permit.dateFiled) : null,
+            isPartnerBuilder: isPartner,
           });
 
           if (existing) {
             await prisma.permit.update({
               where: { permitNumber: permit.permitNumber },
-              data: {
-                status: permit.status,
-                leadScore: score.total,
-                updatedAt: new Date(),
-              },
+              data: { status: permit.status, leadScore: score.total, urgency: score.urgency },
             });
             results.updated++;
           } else {
@@ -76,67 +75,47 @@ export async function GET() {
                 estimatedValue: permit.estimatedValue,
                 squareFootage: permit.squareFootage,
                 dateFiled: permit.dateFiled ? new Date(permit.dateFiled) : null,
-                dateApproved: permit.dateApproved ? new Date(permit.dateApproved) : null,
                 description: permit.description,
                 rawData: permit.rawData,
                 leadScore: score.total,
+                urgency: score.urgency,
+                builderId,
               },
             });
 
-            // Auto-create lead for high-scoring permits
+            // Auto-create leads for high-score permits
             if (score.total >= 50) {
               await prisma.lead.create({
                 data: {
-                  type: 'permit_lead',
-                  status: 'new',
+                  source: 'permit',
+                  stage: 'new',
                   score: score.total,
+                  urgency: score.urgency,
                   firstName: permit.ownerName?.split(' ')[0] || null,
                   lastName: permit.ownerName?.split(' ').slice(1).join(' ') || null,
                   address: permit.propertyAddress,
                   city: permit.city,
                   county: permit.county,
-                  builderName: permit.contractorName,
                   subdivision: permit.subdivision,
-                  source: 'permit_data',
-                  notes: `Auto-created from permit ${permit.permitNumber}. Score: ${score.total}. Factors: ${score.factors.map(f => f.reason).join('; ')}`,
+                  builderId,
+                  homeValue: permit.estimatedValue,
+                  timeline: permit.status === 'applied' ? 'planning' : permit.status === 'approved' ? 'foundation' : 'framing',
+                  notes: `Auto-created from permit ${permit.permitNumber}.\nScore: ${score.total} (${score.urgency})\nContact window: ${score.idealContactWindow}\nFactors: ${score.factors.map(f => f.reason).join('; ')}`,
                   permits: { connect: { id: newPermit.id } },
                 },
               });
+              results.newLeads++;
             }
 
-            results.new++;
+            results.newPermits++;
           }
         } catch (err) {
-          const errMsg = err instanceof Error ? err.message : 'Unknown error';
-          results.errors.push(`Permit ${permit.permitNumber}: ${errMsg}`);
-        }
-      }
-
-      // Update builder stats
-      if (result.permits.length > 0) {
-        const contractors = Array.from(new Set(result.permits.map(p => p.contractorName).filter(Boolean)));
-        for (const contractor of contractors) {
-          if (!contractor) continue;
-          const count = result.permits.filter(p => p.contractorName === contractor).length;
-          await prisma.builder.upsert({
-            where: { slug: contractor.toLowerCase().replace(/[^a-z0-9]+/g, '-') },
-            update: {
-              totalPermits: { increment: count },
-              activePermits: count,
-            },
-            create: {
-              slug: contractor.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-              name: contractor,
-              totalPermits: count,
-              activePermits: count,
-            },
-          });
+          results.errors.push(`Permit ${permit.permitNumber}: ${err instanceof Error ? err.message : 'Unknown'}`);
         }
       }
     }
-  } catch (error) {
-    const errMsg = error instanceof Error ? error.message : 'Unknown error';
-    results.errors.push(`Global error: ${errMsg}`);
+  } catch (err) {
+    results.errors.push(`Scraper error: ${err instanceof Error ? err.message : 'Unknown'}`);
   }
 
   return NextResponse.json(results);

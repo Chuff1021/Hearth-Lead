@@ -1,6 +1,6 @@
 {
   "name": "hearth-lead-engine",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,11 +9,9 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
     "db:seed": "tsx scripts/seed.ts",
     "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset --force && tsx scripts/seed.ts",
-    "scrape": "tsx scripts/scrape-permits.ts",
+    "db:reset": "prisma db push --force-reset && tsx scripts/seed.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
