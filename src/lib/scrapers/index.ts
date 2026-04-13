@@ -1,52 +1,35 @@
-export interface ScrapedPermit {
-  permitNumber: string;
-  type: string;
-  subType?: string;
-  status: string;
-  propertyAddress: string;
-  city: string;
-  county: string;
-  zip?: string;
-  parcelNumber?: string;
-  ownerName?: string;
-  contractorName?: string;
-  subdivision?: string;
-  estimatedValue?: number;
-  squareFootage?: number;
-  dateFiled?: string;
-  dateApproved?: string;
-  description?: string;
-  rawData?: string;
-}
+import { scrapeSpringfieldPermits } from './springfield';
+import { scrapeHbaExcel } from './hba-excel';
+import { scrapeChristianCountyPermits } from './christian-county';
+import type { ScrapedPermit, ScrapeResult } from './types';
 
-export interface ScrapeResult {
-  source: string;
-  permits: ScrapedPermit[];
-  error?: string;
-}
+export type { ScrapedPermit, ScrapeResult };
 
 /**
- * Modular scraping architecture.
- * Each source is its own adapter — add new counties by adding a new file.
- * Currently: Springfield eCity, Ozark SmartGov.
- * Greene County and Christian County unincorporated don't have online portals — manual entry only.
+ * Run all scrapers. Each one is independent — a failure in one doesn't block others.
+ *
+ * Sources:
+ * 1. Springfield Permit Report (www1.springfieldmo.gov) — live HTML, residential permits
+ * 2. HBA Excel files (hbaspringfield.com) — monthly, has $ values, covers SGF + Greene Co
+ * 3. Christian County PDFs (christiancountymo.gov) — monthly, covers Ozark/Nixa/etc.
  */
-export async function scrapeAllPermits(options: { daysBack?: number } = {}): Promise<ScrapeResult[]> {
+export async function scrapeAllPermits(options: { monthsBack?: number } = {}): Promise<ScrapeResult[]> {
+  const { monthsBack = 2 } = options;
   const results: ScrapeResult[] = [];
 
-  // Each scraper runs independently so one failure doesn't block others
-  const scraperModules = [
-    { name: 'springfield', fn: () => import('./springfield').then(m => m.scrapeSpringfieldPermits(options)) },
-    { name: 'ozark', fn: () => import('./ozark').then(m => m.scrapeOzarkPermits(options)) },
+  const scrapers = [
+    { name: 'Springfield Permit Report', fn: () => scrapeSpringfieldPermits({ monthsBack }) },
+    { name: 'HBA Excel (SGF + Greene Co)', fn: () => scrapeHbaExcel({ monthsBack }) },
+    { name: 'Christian County PDF', fn: () => scrapeChristianCountyPermits({ monthsBack }) },
   ];
 
   const settled = await Promise.allSettled(
-    scraperModules.map(async s => {
+    scrapers.map(async (s) => {
       try {
         const permits = await s.fn();
-        return { source: s.name, permits } as ScrapeResult;
+        return { source: s.name, permits, scrapedAt: new Date().toISOString() } as ScrapeResult;
       } catch (err) {
-        return { source: s.name, permits: [], error: err instanceof Error ? err.message : 'Unknown' } as ScrapeResult;
+        return { source: s.name, permits: [], error: err instanceof Error ? err.message : 'Unknown', scrapedAt: new Date().toISOString() } as ScrapeResult;
       }
     })
   );

@@ -15,7 +15,7 @@ export async function GET() {
   try {
     // Dynamic import to keep bundle small
     const { scrapeAllPermits } = await import('@/lib/scrapers');
-    const scrapeResults = await scrapeAllPermits({ daysBack: 30 });
+    const scrapeResults = await scrapeAllPermits({ monthsBack: 2 });
 
     for (const result of scrapeResults) {
       if (result.error) {

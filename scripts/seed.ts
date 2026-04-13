@@ -91,6 +91,17 @@ async function seed() {
     const isPartner = builder.relationship === 'partner';
     const score = scorePermitLead({ type: 'new_residential', estimatedValue: val, squareFootage: sqft, status, subdivision: sub, contractorName: builder.name, city: city.name, dateFiled: filed, isPartnerBuilder: isPartner });
 
+    // Generate realistic lat/lng in the Springfield metro area
+    const cityCoords: Record<string, [number, number]> = {
+      'Springfield': [37.2090, -93.2923], 'Nixa': [37.0431, -93.2946],
+      'Ozark': [37.0209, -93.2060], 'Republic': [37.1200, -93.4802],
+      'Battlefield': [37.1148, -93.3696], 'Rogersville': [37.1170, -93.0557],
+      'Willard': [37.3054, -93.4285], 'Strafford': [37.2681, -93.1172],
+    };
+    const [baseLat, baseLng] = cityCoords[city.name] || [37.2090, -93.2923];
+    const lat = baseLat + (Math.random() - 0.5) * 0.06;
+    const lng = baseLng + (Math.random() - 0.5) * 0.08;
+
     const permit = await prisma.permit.create({
       data: {
         permitNumber: `${city.name.slice(0,3).toUpperCase()}-${2024 + Math.floor(i/75)}-${String(1000+i).slice(1)}`,
@@ -99,6 +110,7 @@ async function seed() {
         ownerName: `${pick(FIRST)} ${pick(LAST)}`, contractorName: builder.name, builderId: builderMap[builder.slug],
         subdivision: sub, estimatedValue: val, squareFootage: sqft, stories: pick([1,1,2,2,2]),
         bedrooms: pick([3,3,4,4,5]), bathrooms: pick([2,2,2.5,3,3.5]),
+        lat, lng,
         dateFiled: filed, dateApproved: status !== 'applied' ? new Date(filed.getTime() + rand(7,30)*86400000) : null,
         description: `New SFR, ${sqft} sqft, ${pick([3,4,4,5])} bed/${pick([2,2.5,3])} bath`,
         leadScore: score.total, urgency: score.urgency,

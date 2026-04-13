@@ -41,6 +41,8 @@ model Permit {
   dateFinal       DateTime?
   description     String?
   rawData         String?
+  lat             Float?
+  lng             Float?
   leadScore       Int      @default(0)
   urgency         String   @default("normal") // hot, warm, normal, cold
   leadId          String?
