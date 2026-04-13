@@ -42,6 +42,9 @@ export async function scrapeHbaExcel(options: { monthsBack?: number } = {}): Pro
         const buffer = await res.arrayBuffer();
         const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
 
+        // Use the 15th of the file's month as the approximate date
+        const fileDate = new Date(year, d.getMonth(), 15).toISOString().split('T')[0];
+
         // Parse Springfield sheet
         const sgfSheet = workbook.SheetNames.find(n => n.toLowerCase().includes('springfield'));
         if (sgfSheet) {
@@ -63,6 +66,7 @@ export async function scrapeHbaExcel(options: { monthsBack?: number } = {}): Pro
               ownerName: (row['Owner/Leasee'] || row['Owner'] || '').trim() || undefined,
               contractorName: (row['Primary Contact'] || '').trim() || undefined,
               description: desc.trim() || undefined,
+              dateFiled: fileDate,
               source: 'hba_springfield',
             });
           }
@@ -102,6 +106,7 @@ export async function scrapeHbaExcel(options: { monthsBack?: number } = {}): Pro
               contractorName: (String(row['Contractor'] || '')).trim() || undefined,
               description: desc.trim() || undefined,
               estimatedValue: value,
+              dateFiled: fileDate,
               source: 'hba_greene_county',
             });
           }
