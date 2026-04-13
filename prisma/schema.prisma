@@ -314,3 +314,118 @@ model Competitor {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+// ─── GBP METRICS SNAPSHOTS ─────────────────────────────────
+
+model GbpMetricsSnapshot {
+  id              String   @id @default(cuid())
+  date            DateTime
+  views           Int      @default(0)
+  searches        Int      @default(0)
+  calls           Int      @default(0)
+  directions      Int      @default(0)
+  websiteClicks   Int      @default(0)
+  photoViews      Int      @default(0)
+  topSearchTerms  String?  // JSON array
+  createdAt       DateTime @default(now())
+
+  @@unique([date])
+  @@index([date])
+}
+
+// ─── GOOGLE ADS ─────────────────────────────────────────────
+
+model GoogleAdsCampaign {
+  id              String   @id @default(cuid())
+  campaignId      String   @unique
+  name            String
+  status          String   // ENABLED, PAUSED, REMOVED
+  type            String   // SEARCH, DISPLAY, PERFORMANCE_MAX
+  dailyBudget     Float
+  spendToday      Float    @default(0)
+  spendThisMonth  Float    @default(0)
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  ctr             Float    @default(0)
+  avgCpc          Float    @default(0)
+  conversions     Int      @default(0)
+  costPerConv     Float    @default(0)
+  conversionValue Float    @default(0)
+  keywords        GoogleAdsKeyword[]
+  recommendations GoogleAdsRecommendation[]
+  snapshotDate    DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+}
+
+model GoogleAdsKeyword {
+  id            String   @id @default(cuid())
+  campaignId    String
+  campaign      GoogleAdsCampaign @relation(fields: [campaignId], references: [id])
+  adGroupName   String?
+  keyword       String
+  matchType     String   // EXACT, PHRASE, BROAD
+  status        String   @default("ENABLED") // ENABLED, PAUSED
+  impressions   Int      @default(0)
+  clicks        Int      @default(0)
+  ctr           Float    @default(0)
+  avgCpc        Float    @default(0)
+  conversions   Int      @default(0)
+  costPerConv   Float    @default(0)
+  qualityScore  Int?     // 1-10
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([qualityScore])
+}
+
+model GoogleAdsRecommendation {
+  id           String    @id @default(cuid())
+  campaignId   String?
+  campaign     GoogleAdsCampaign? @relation(fields: [campaignId], references: [id])
+  type         String    // budget, keyword, negative_keyword, ad_copy, bid, schedule, seasonal
+  title        String
+  description  String    // Plain language explanation
+  impact       String?   // Expected impact
+  details      String?   // JSON with specific changes to make
+  status       String    @default("pending") // pending, approved, dismissed
+  appliedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([status])
+  @@index([type])
+}
+
+// ─── AI CONVERSATIONS ───────────────────────────────────────
+
+model AiConversation {
+  id          String   @id @default(cuid())
+  userMessage String
+  aiResponse  String
+  actions     String?  // JSON array of actions taken
+  category    String?  // ads, seo, gbp, content, general
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ─── MARKETING ATTRIBUTION ──────────────────────────────────
+
+model MarketingAttribution {
+  id             String   @id @default(cuid())
+  leadId         String?
+  source         String   // google_ads, organic, gbp, permit, referral, direct, social
+  channel        String?  // paid_search, organic_search, local, email, phone
+  campaign       String?
+  keyword        String?
+  landingPage    String?
+  conversionDate DateTime?
+  revenue        Float?
+  createdAt      DateTime @default(now())
+
+  @@index([source])
+  @@index([leadId])
+}

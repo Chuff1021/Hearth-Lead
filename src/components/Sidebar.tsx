@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   Flame, LayoutDashboard, FileText, Users, Building2,
-  Search, Star, PenTool, BarChart3, Settings, ChevronLeft, ChevronRight
+  Search, Star, PenTool, BarChart3, Settings, ChevronLeft, ChevronRight,
+  Megaphone, MessageSquare
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -15,10 +16,12 @@ const NAV = [
   { href: '/leads', icon: Users, label: 'Leads' },
   { href: '/builders', icon: Building2, label: 'Builders' },
   { type: 'divider' as const },
-  { href: '/seo', icon: Search, label: 'SEO' },
   { href: '/google-business', icon: Star, label: 'Google Business' },
+  { href: '/google-ads', icon: Megaphone, label: 'Google Ads' },
+  { href: '/seo', icon: Search, label: 'SEO' },
   { href: '/content', icon: PenTool, label: 'Content' },
   { type: 'divider' as const },
+  { href: '/ai-chat', icon: MessageSquare, label: 'AI Chat' },
   { href: '/reports', icon: BarChart3, label: 'Reports' },
   { href: '/settings', icon: Settings, label: 'Settings' },
 ] as const;
