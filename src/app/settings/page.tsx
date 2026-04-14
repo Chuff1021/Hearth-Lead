@@ -165,10 +165,10 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {!conn.connected && (
-                    <button className="btn-primary btn-sm" disabled>
-                      Connect {conn.name.split(' ')[0]}
-                    </button>
+                  {!conn.connected && conn.name !== 'AI Engine (Claude)' && (
+                    <a href="/api/google/auth" className="btn-primary btn-sm">
+                      Connect Google Account
+                    </a>
                   )}
                   <a href={conn.docsUrl} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm text-orange-600">
                     <ExternalLink className="w-3.5 h-3.5" /> API Docs
