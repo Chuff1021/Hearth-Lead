@@ -4,28 +4,51 @@ import prisma from '@/lib/db';
 import { formatCurrency, formatDate, formatRelative, permitStatusBadge, urgencyBadge, urgencyBorder, stageBadge } from '@/lib/utils';
 import PermitMapWrapper from './PermitMapWrapper';
 
+type SortField = 'dateFiled' | 'leadScore' | 'estimatedValue' | 'createdAt';
+type SortDir = 'asc' | 'desc';
+
 async function getPermits(params: Record<string, string | undefined>) {
   try {
     const where: Record<string, unknown> = {};
     if (params.city) where.city = params.city;
     if (params.urgency) where.urgency = params.urgency;
     if (params.builder) where.contractorName = { contains: params.builder };
+    if (params.source) where.source = params.source;
 
-    const [permits, cities, counts] = await Promise.all([
-      prisma.permit.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200, include: { builder: { select: { name: true, relationship: true } }, lead: { select: { id: true, stage: true } } } }),
+    const sortField = (params.sort as SortField) || 'dateFiled';
+    const sortDir = (params.dir as SortDir) || 'desc';
+
+    const [permits, cities, counts, sources, total] = await Promise.all([
+      prisma.permit.findMany({ where, orderBy: { [sortField]: sortDir }, take: 200, include: { builder: { select: { name: true, relationship: true } }, lead: { select: { id: true, stage: true } } } }),
       prisma.permit.groupBy({ by: ['city'], _count: true, orderBy: { _count: { city: 'desc' } } }),
       prisma.permit.groupBy({ by: ['urgency'], _count: true }),
+      prisma.permit.groupBy({ by: ['source'], _count: true, orderBy: { _count: { source: 'desc' } } }),
+      prisma.permit.count({ where }),
     ]);
 
-    return { permits, cities, urgencyCounts: Object.fromEntries(counts.map(c => [c.urgency, c._count])) };
+    return { permits, cities, urgencyCounts: Object.fromEntries(counts.map(c => [c.urgency, c._count])), sources, total };
   } catch {
-    return { permits: [], cities: [], urgencyCounts: {} };
+    return { permits: [], cities: [], urgencyCounts: {}, sources: [], total: 0 };
   }
 }
 
 export default async function PermitsPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
-  const { permits, cities, urgencyCounts } = await getPermits(searchParams);
+  const { permits, cities, urgencyCounts, sources, total } = await getPermits(searchParams);
   const view = searchParams.view || 'list';
+  const currentSort = searchParams.sort || 'dateFiled';
+  const currentDir = searchParams.dir || 'desc';
+
+  // Helper to build sort URL preserving other params
+  function sortUrl(field: string) {
+    const params = new URLSearchParams();
+    if (searchParams.city) params.set('city', searchParams.city);
+    if (searchParams.urgency) params.set('urgency', searchParams.urgency);
+    if (searchParams.source) params.set('source', searchParams.source);
+    params.set('view', view);
+    params.set('sort', field);
+    params.set('dir', currentSort === field && currentDir === 'desc' ? 'asc' : 'desc');
+    return `/permits?${params.toString()}`;
+  }
 
   // Permits with coordinates for the map
   const mapPermits = permits.filter(p => p.lat && p.lng).map(p => ({
@@ -40,7 +63,7 @@ export default async function PermitsPage({ searchParams }: { searchParams: Reco
       <div className="page-header">
         <div>
           <h1 className="page-title">Building Permits</h1>
-          <p className="page-subtitle">{permits.length} residential permits &middot; Greene & Christian County</p>
+          <p className="page-subtitle">{total} total permits &middot; showing {permits.length} &middot; Greene & Christian County</p>
         </div>
         <div className="flex items-center gap-2">
           {/* View toggle */}
@@ -60,22 +83,52 @@ export default async function PermitsPage({ searchParams }: { searchParams: Reco
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="card p-3 mb-4">
+      {/* Filters + Sort */}
+      <div className="card p-3 mb-4 space-y-2">
+        {/* City + Urgency filters */}
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="w-4 h-4 text-gray-400" />
-          <Link href={`/permits?view=${view}`} className={`btn-xs rounded-full ${!searchParams.city && !searchParams.urgency ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>All</Link>
+          <Link href={`/permits?view=${view}&sort=${currentSort}&dir=${currentDir}`} className={`btn-xs rounded-full ${!searchParams.city && !searchParams.urgency && !searchParams.source ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>All</Link>
           {cities.map(c => (
-            <Link key={c.city} href={`/permits?city=${c.city}&view=${view}`} className={`btn-xs rounded-full ${searchParams.city === c.city ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            <Link key={c.city} href={`/permits?city=${c.city}&view=${view}&sort=${currentSort}&dir=${currentDir}`} className={`btn-xs rounded-full ${searchParams.city === c.city ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {c.city} <span className="text-[10px] opacity-70 ml-0.5">{c._count}</span>
             </Link>
           ))}
           <span className="border-l border-gray-300 h-4 mx-1" />
           {(['hot', 'warm', 'normal'] as const).map(u => (
-            <Link key={u} href={`/permits?urgency=${u}&view=${view}`} className={`btn-xs rounded-full ${searchParams.urgency === u ? 'bg-orange-600 text-white' : u === 'hot' ? 'bg-red-50 text-red-700 hover:bg-red-100' : u === 'warm' ? 'bg-orange-50 text-orange-700 hover:bg-orange-100' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
+            <Link key={u} href={`/permits?urgency=${u}&view=${view}&sort=${currentSort}&dir=${currentDir}`} className={`btn-xs rounded-full ${searchParams.urgency === u ? 'bg-orange-600 text-white' : u === 'hot' ? 'bg-red-50 text-red-700 hover:bg-red-100' : u === 'warm' ? 'bg-orange-50 text-orange-700 hover:bg-orange-100' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
               {u} <span className="text-[10px] opacity-70 ml-0.5">{urgencyCounts[u] || 0}</span>
             </Link>
           ))}
+        </div>
+
+        {/* Source filter + Sort controls */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Source:</span>
+            {sources.map(s => {
+              const label = s.source.replace(/_/g, ' ').replace('hba ', 'HBA ').replace('springfield report', 'Springfield').replace('ozark smartgov', 'Ozark');
+              return (
+                <Link key={s.source} href={`/permits?source=${s.source}&view=${view}&sort=${currentSort}&dir=${currentDir}`}
+                  className={`btn-xs rounded-full ${searchParams.source === s.source ? 'bg-orange-600 text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}>
+                  {label} <span className="text-[10px] opacity-70 ml-0.5">{s._count}</span>
+                </Link>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Sort:</span>
+            {([
+              { field: 'dateFiled', label: 'Date' },
+              { field: 'leadScore', label: 'Score' },
+              { field: 'estimatedValue', label: 'Value' },
+            ] as const).map(s => (
+              <Link key={s.field} href={sortUrl(s.field)}
+                className={`btn-xs rounded-full ${currentSort === s.field ? 'bg-gray-800 text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}>
+                {s.label} {currentSort === s.field && (currentDir === 'desc' ? '↓' : '↑')}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
 
