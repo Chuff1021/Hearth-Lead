@@ -11,29 +11,34 @@ interface Message {
 }
 
 const QUICK_PROMPTS = [
-  { icon: <BarChart3 className="w-3.5 h-3.5" />, label: 'Weekly summary', prompt: 'Give me a summary of how my business marketing did this week' },
-  { icon: <Star className="w-3.5 h-3.5" />, label: 'Draft GBP post', prompt: 'Write a Google Business post about our current fireplace selection' },
-  { icon: <Megaphone className="w-3.5 h-3.5" />, label: 'Ad recommendations', prompt: 'What should I do to improve my Google Ads performance?' },
-  { icon: <Search className="w-3.5 h-3.5" />, label: 'SEO priorities', prompt: 'What are the top 3 SEO things I should work on this week?' },
-  { icon: <Star className="w-3.5 h-3.5" />, label: 'Review response', prompt: 'Help me respond to my latest Google reviews' },
-  { icon: <PenTool className="w-3.5 h-3.5" />, label: 'Blog post idea', prompt: 'Suggest a blog post topic that would help my SEO right now' },
-  { icon: <Megaphone className="w-3.5 h-3.5" />, label: 'New ad copy', prompt: 'Write new ad copy for my gas fireplace installation campaign' },
-  { icon: <Flame className="w-3.5 h-3.5" />, label: 'Permit + marketing', prompt: 'Are there any new subdivisions from permit data that I should target with ads or content?' },
+  { icon: <BarChart3 className="w-3.5 h-3.5" />, label: 'Weekly strategy', prompt: 'Give me my weekly marketing strategy. What should I focus on this week across Google Ads, SEO, Google Business, content, and lead outreach? Prioritize by impact and ROI.' },
+  { icon: <User className="w-3.5 h-3.5" />, label: 'Beat competitors', prompt: 'Analyze my competitors and give me a detailed competitive strategy. What are they doing that I\'m not? What am I doing better? How do I win against each one specifically?' },
+  { icon: <Megaphone className="w-3.5 h-3.5" />, label: 'Optimize ads', prompt: 'Analyze all of my Google Ads campaigns. Which ones are performing well? Which need work? Give me specific changes to make — keywords to add, budgets to adjust, ad copy to test.' },
+  { icon: <Search className="w-3.5 h-3.5" />, label: 'SEO roadmap', prompt: 'Give me a comprehensive SEO strategy. Analyze my rankings, page health, and content gaps. What keywords should I prioritize? What content do I need to create? What technical fixes are most urgent?' },
+  { icon: <Star className="w-3.5 h-3.5" />, label: 'GBP strategy', prompt: 'How do I dominate local search with my Google Business Profile? Analyze my reviews, posts, and compare me to competitors. What should I post this week? How do I get more reviews?' },
+  { icon: <PenTool className="w-3.5 h-3.5" />, label: '30-day content plan', prompt: 'Create a 30-day content plan. Give me blog post topics with keywords, Google Business posts, and social media ideas. Each tied to a business goal.' },
+  { icon: <Star className="w-3.5 h-3.5" />, label: 'Respond to reviews', prompt: 'Help me respond to my Google reviews that need responses. Draft personalized replies for each one.' },
+  { icon: <Flame className="w-3.5 h-3.5" />, label: 'Permit opportunities', prompt: 'Analyze my permit data and tell me which subdivisions and builders I should target with marketing. Should I create any new Google Ads campaigns, blog posts, or outreach based on construction trends?' },
+  { icon: <Megaphone className="w-3.5 h-3.5" />, label: 'Write ad copy', prompt: 'Write new responsive search ad copy for my gas fireplace installation campaign. Give me 10 headlines and 4 descriptions optimized for Springfield MO.' },
+  { icon: <BarChart3 className="w-3.5 h-3.5" />, label: 'ROI report', prompt: 'Give me an ROI analysis. Which marketing channels are generating the most revenue? Google Ads vs organic search vs permit outreach vs Google Business — where should I put more money?' },
 ];
 
 export default function AiChatPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'ai',
-      content: `Hey Aaron! I'm your AI marketing assistant. I can help you with:
+      content: `Hey Aaron. I'm your AI marketing strategist — think of me as your virtual CMO.
 
-**Google Business** — Draft review responses, create posts, analyze your profile performance
-**Google Ads** — Review campaign performance, suggest optimizations, write ad copy
-**SEO** — Analyze your website, suggest content, track keyword rankings
-**Content** — Write blog posts, plan your content calendar, optimize for search
-**Strategy** — Connect permit data with marketing opportunities, seasonal planning
+I have access to all your business data: **479 building permits**, your **lead pipeline**, **Google Ads campaigns**, **SEO rankings**, **Google Business reviews**, and **competitor intelligence**.
 
-What would you like to work on?`,
+Ask me anything, or hit one of the buttons below. Here are the big ones:
+
+**"Beat competitors"** — I'll analyze every competitor and tell you exactly how to win
+**"Weekly strategy"** — Your prioritized action plan for this week
+**"Optimize ads"** — Specific changes to improve your Google Ads ROI
+**"SEO roadmap"** — What to fix on your website and what content to create
+
+I analyze your actual data and give you specific, actionable moves — not generic advice. What do you want to tackle?`,
       category: 'general',
       timestamp: new Date(),
     },
