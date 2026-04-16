@@ -21,7 +21,7 @@ import prisma from '@/lib/db';
  */
 
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
-const DEFAULT_MODEL = 'meta/llama-3.3-70b-instruct';
+const DEFAULT_MODEL = 'nvidia/llama-3.1-nemotron-ultra-253b-v1';
 
 function hasNvidiaKey(): boolean {
   return !!process.env.NVIDIA_API_KEY;

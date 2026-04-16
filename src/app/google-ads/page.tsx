@@ -2,6 +2,7 @@ import { Megaphone, DollarSign, MousePointer, Eye, Target, TrendingUp, TrendingD
 import prisma from '@/lib/db';
 import { formatCurrency } from '@/lib/utils';
 import StatCard from '@/components/StatCard';
+import RecommendationCard from '@/components/RecommendationCard';
 
 async function getAdsData() {
   try {
@@ -193,26 +194,14 @@ export default async function GoogleAdsPage() {
             </div>
             <div className="divide-y divide-gray-50 max-h-[800px] overflow-y-auto">
               {recommendations.map(rec => (
-                <div key={rec.id} className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`badge text-[10px] ${rec.type === 'budget' ? 'badge-red' : rec.type === 'keyword' || rec.type === 'negative_keyword' ? 'badge-blue' : rec.type === 'ad_copy' ? 'badge-purple' : rec.type === 'seasonal' ? 'badge-orange' : 'badge-gray'}`}>
-                      {rec.type.replace('_', ' ')}
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium text-gray-900 mb-1">{rec.title}</p>
-                  <p className="text-xs text-gray-600 mb-2">{rec.description}</p>
-                  {rec.impact && (
-                    <p className="text-xs text-indigo-600 font-medium mb-3">{rec.impact}</p>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <button className="btn-primary btn-xs">
-                      <CheckCircle className="w-3 h-3" /> Approve
-                    </button>
-                    <button className="btn-ghost btn-xs text-gray-400">
-                      <X className="w-3 h-3" /> Dismiss
-                    </button>
-                  </div>
-                </div>
+                <RecommendationCard
+                  key={rec.id}
+                  id={rec.id}
+                  type={rec.type}
+                  title={rec.title}
+                  description={rec.description}
+                  impact={rec.impact}
+                />
               ))}
               {recommendations.length === 0 && (
                 <div className="p-8 text-center text-gray-300">
