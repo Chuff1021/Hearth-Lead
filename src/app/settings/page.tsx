@@ -75,18 +75,20 @@ const CONNECTIONS: ConnectionStatus[] = [
     docsUrl: 'https://developers.google.com/analytics/devguides/reporting/data/v1',
   },
   {
-    name: 'AI Engine (Claude)',
+    name: 'AI Engine (NVIDIA)',
     icon: <Shield className="w-5 h-5 text-indigo-600" />,
-    description: 'AI-powered review responses, ad copy, SEO content, recommendations',
+    description: 'AI-powered review responses, ad copy, SEO content, competitive strategy, recommendations',
     connected: false,
     setupSteps: [
-      'Get an API key from console.anthropic.com',
-      'Set ANTHROPIC_API_KEY in Vercel env vars',
-      'The app uses claude-sonnet for fast drafting and analysis',
+      'Go to build.nvidia.com and sign in (free)',
+      'Click "Get API Key" in the top right',
+      'Set NVIDIA_API_KEY in Vercel env vars',
+      'Optional: Set NVIDIA_MODEL to override the default (meta/llama-3.3-70b-instruct)',
+      'Recommended models: meta/llama-3.3-70b-instruct (fast + smart), nvidia/llama-3.3-nemotron-super-49b-v1 (reasoning), deepseek-ai/deepseek-r1 (deep analysis)',
       'Without this key, the app falls back to built-in templates (still works, just not as personalized)',
     ],
-    envVars: ['ANTHROPIC_API_KEY'],
-    docsUrl: 'https://docs.anthropic.com/en/api/getting-started',
+    envVars: ['NVIDIA_API_KEY', 'NVIDIA_MODEL (optional)'],
+    docsUrl: 'https://build.nvidia.com',
   },
 ];
 

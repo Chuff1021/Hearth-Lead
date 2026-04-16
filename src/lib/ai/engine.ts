@@ -1,26 +1,72 @@
-import Anthropic from '@anthropic-ai/sdk';
 import prisma from '@/lib/db';
 
 /**
- * The AI SEO Brain — Claude-powered strategic engine for Aaron's Fireplace.
+ * The AI SEO Brain — NVIDIA-powered strategic engine for Aaron's Fireplace.
+ *
+ * Uses NVIDIA's hosted models via their OpenAI-compatible API.
+ * Default model: meta/llama-3.3-70b-instruct (great balance of speed + quality)
+ * Override with NVIDIA_MODEL env var. Recommended models:
+ *   - meta/llama-3.3-70b-instruct (default — fast, smart, handles strategy well)
+ *   - nvidia/llama-3.3-nemotron-super-49b-v1 (NVIDIA-tuned for reasoning)
+ *   - deepseek-ai/deepseek-r1 (deepest reasoning, slower)
+ *   - meta/llama-3.1-405b-instruct (premium quality, heaviest)
  *
  * This is the core intelligence. It:
  * 1. Gathers all business data (permits, leads, ads, SEO, reviews, competitors)
  * 2. Builds a comprehensive context prompt
- * 3. Sends to Claude with the specific question
+ * 3. Sends to NVIDIA model with the specific question
  * 4. Returns strategic, actionable output
  *
- * Works with or without ANTHROPIC_API_KEY — falls back to built-in analysis.
+ * Works with or without NVIDIA_API_KEY — falls back to built-in analysis.
  */
 
-let anthropic: Anthropic | null = null;
+const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
+const DEFAULT_MODEL = 'meta/llama-3.3-70b-instruct';
 
-function getClient(): Anthropic | null {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  if (!anthropic) {
-    anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function hasNvidiaKey(): boolean {
+  return !!process.env.NVIDIA_API_KEY;
+}
+
+async function callNvidia(systemPrompt: string, userMessage: string, options: { maxTokens?: number; temperature?: number } = {}): Promise<string | null> {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  if (!apiKey) return null;
+
+  const model = process.env.NVIDIA_MODEL || DEFAULT_MODEL;
+  const { maxTokens = 2000, temperature = 0.5 } = options;
+
+  try {
+    const res = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        max_tokens: maxTokens,
+        temperature,
+        top_p: 0.9,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!res.ok) {
+      console.error(`NVIDIA API ${res.status}:`, await res.text());
+      return null;
+    }
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || null;
+  } catch (err) {
+    console.error('NVIDIA API error:', err);
+    return null;
   }
-  return anthropic;
 }
 
 // ─── BUSINESS CONTEXT BUILDER ────────────────────────────
@@ -126,7 +172,6 @@ Ideas backlog: ${contentItems.filter(c => c.status === 'idea').length}
 // ─── CLAUDE AI CALL ──────────────────────────────────────
 
 export async function askAI(userMessage: string, systemOverride?: string): Promise<{ response: string; category: string }> {
-  const client = getClient();
   const context = await buildBusinessContext();
 
   const systemPrompt = systemOverride || `You are the AI marketing strategist for Aaron's Fireplace, a local fireplace/hearth company in Springfield, Missouri. Aaron is talking to you directly — he's a business owner, not a marketer or developer.
@@ -153,27 +198,14 @@ RESPONSE FORMAT:
 - If you recommend changes to Google Ads, GBP, or website, be specific about exactly what to change
 - When analyzing competitors, focus on actionable gaps Aaron can exploit`;
 
-  if (!client) {
-    // Fallback: use built-in analysis when no API key
+  if (!hasNvidiaKey()) {
     return fallbackAnalysis(userMessage, context);
   }
 
-  try {
-    const msg = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    });
+  const response = await callNvidia(systemPrompt, userMessage, { maxTokens: 2000, temperature: 0.5 });
+  if (!response) return fallbackAnalysis(userMessage, context);
 
-    const response = msg.content[0].type === 'text' ? msg.content[0].text : 'I had trouble generating a response.';
-    const category = categorizeMessage(userMessage);
-
-    return { response, category };
-  } catch (err) {
-    console.error('Claude API error:', err);
-    return fallbackAnalysis(userMessage, context);
-  }
+  return { response, category: categorizeMessage(userMessage) };
 }
 
 // ─── SPECIALIZED AI FUNCTIONS ────────────────────────────
@@ -300,7 +332,7 @@ function fallbackAnalysis(message: string, context: string): { response: string;
     return {
       response: `**Competitor Analysis (based on tracked data):**
 
-To get AI-powered competitor analysis with specific strategies, add your Anthropic API key (\`ANTHROPIC_API_KEY\`) to Vercel environment variables.
+To get AI-powered competitor analysis with specific strategies, add your Anthropic API key (\`NVIDIA_API_KEY\`) to Vercel environment variables.
 
 **What I can see from your data:**
 - You're tracking competitors on the Google Business page
@@ -312,7 +344,7 @@ To get AI-powered competitor analysis with specific strategies, add your Anthrop
 3. Search for "fireplace springfield mo" and see who's ranking above you
 4. Look at what keywords competitors are bidding on in Google Ads
 
-Set up \`ANTHROPIC_API_KEY\` in Vercel and I'll give you detailed, data-driven strategies.`,
+Set up \`NVIDIA_API_KEY\` in Vercel and I'll give you detailed, data-driven strategies.`,
       category,
     };
   }
@@ -325,7 +357,7 @@ ${unrepliedReviews > 0 ? `1. **Respond to ${unrepliedReviews} Google reviews** �
 5. **Audit your website** — go to SEO page and run a site audit
 
 **To unlock full AI strategy (competitor analysis, ad optimization, content planning):**
-Add \`ANTHROPIC_API_KEY\` to your Vercel environment variables. Get a key at console.anthropic.com.`,
+Add \`NVIDIA_API_KEY\` to your Vercel environment variables. Get a key at console.anthropic.com.`,
       category,
     };
   }
@@ -334,7 +366,7 @@ Add \`ANTHROPIC_API_KEY\` to your Vercel environment variables. Get a key at con
     response: `I can help with that! For detailed, AI-powered analysis and strategies, connect the Claude AI engine:
 
 1. Get an API key at **console.anthropic.com**
-2. Add \`ANTHROPIC_API_KEY\` to Vercel → Settings → Environment Variables
+2. Add \`NVIDIA_API_KEY\` to Vercel → Settings → Environment Variables
 3. Redeploy (or it picks up on next deploy)
 
 Once connected, I can:
